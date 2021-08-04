@@ -1,6 +1,11 @@
 ### Anatomical-awareness-in-the-electric-field-estimation
 There is the support file for the conference paper: anatomical awareness improves the accuracy of the real-time electric field estimation
 
+### software:
+python 3.8
+torch >=1.8
+
+
 ### Here only support for below models for the anatomcial segmentation or electric estimation:
 
 #### anatomical segmentation model:
