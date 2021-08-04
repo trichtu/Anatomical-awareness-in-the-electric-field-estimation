@@ -8,7 +8,6 @@ from torch import optim
 from torch.autograd import Variable
 import torch.nn.functional as F
 from evaluation import *
-
 from network3D import U_Net3D, U_Net3D_Att
 import csv
 import pandas as pd
@@ -16,7 +15,6 @@ from data_loader import get_evalutation_loader
 import random
 import os
 import nibabel as nib
-
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 class Solver(object):
@@ -34,15 +32,13 @@ class Solver(object):
 		self.output_ch = config.output_ch
 		self.model_type = config.model_type
 
-
 		if self.model_type in ['U_Net_Seg']:
 			self.criterion = FocalLoss()
-			print('use focal loss')
 		else:
 			self.criterion = torch.nn.MSELoss(reduction='mean')
 
 		self.augmentation_prob = config.augmentation_prob
- 
+
 		# Hyper-parameters
 		self.lr = config.lr
 		self.beta1 = config.beta1
@@ -64,8 +60,8 @@ class Solver(object):
 
 		self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		print('model:', self.model_type, 'batch_size:', self.batch_size)
-		self.build_model()
-
+		if self.model_type != 'two_step':
+			self.build_model()
 
 	def build_model(self):
 		"""Build generator and discriminator."""
@@ -87,9 +83,6 @@ class Solver(object):
 		self.optimizer = optim.Adam(list(self.unet.parameters()), self.lr, [self.beta1, self.beta2])
 		self.unet.to(self.device)
 
-# 		self.print_network(self.unet, self.model_type)
-
-
 	def print_network(self, model, name):
 		"""Print out the network information."""
 		num_params = 0
@@ -99,23 +92,19 @@ class Solver(object):
 		print(name)
 		print("The number of parameters: {}".format(num_params))
 
-
 	def to_data(self, x):
 		"""Convert variable to tensor."""
 		if torch.cuda.is_available():
 			x = x.cpu()
 		return x.data
 
-
 	def update_lr(self, g_lr, d_lr):
 		for param_group in self.optimizer.param_groups:
 			param_group['lr'] = lr
 
-
 	def reset_grad(self):
 		"""Zero the gradient buffers."""
 		self.unet.zero_grad()
-
 
 	def train(self):
 		"""Train encoder, generator and discriminator."""
@@ -125,6 +114,7 @@ class Solver(object):
 
 		unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %(self.model_type,self.num_epochs,self.lr,self.num_epochs_decay,self.augmentation_prob))
 		load_path = unet_path
+
 		# U-Net Train
 		if os.path.isfile(load_path):
 			# Load the pretrained Encoder
@@ -148,17 +138,14 @@ class Solver(object):
 				if self.model_type in ['U_Net3D_Att_Seg','U_Net3D_Att_Seg_V2']:
 					images = torch.cat((images,seg), 1)
 					SR = self.unet(images)
-				elif self.model_type in ['U_Net3D_Att_ASPP']:
-    					SR, preseg = self.unet(images)
-					seg = seg.to(torch.int64)
 				elif self.model_type in ['U_Net_Seg']:
-					# seg = seg.to(torch.long)
 					SR = self.unet(images)
 				else:
 					SR = self.unet(images)
 
 				SR_flat = SR.view(SR.size(0),-1)              
 				GT_flat = GT.view(GT.size(0),-1)
+
 
 				if self.model_type in ['U_Net_Seg']:
 					loss = self.criterion(SR, seg)
@@ -168,7 +155,8 @@ class Solver(object):
 				epoch_loss += loss.item()
 				self.reset_grad()
 				loss.backward()
-				self.optimizer.step()    
+				self.optimizer.step()
+				# abs_diff = torch.abs(SR_flat-GT_flat).sum()      
 				print('epoch: ', epoch, 'train batch number: ', i, 'training loss:', loss.item())   
 
 
@@ -200,6 +188,7 @@ class Solver(object):
 					images = torch.cat((images,seg), 1)
 					SR = self.unet(images)
 				elif self.model_type in ['U_Net_Seg']:
+					# seg = seg.to(torch.int64)
 					SR = self.unet(images)
 				else:
 					SR = self.unet(images)
@@ -207,7 +196,6 @@ class Solver(object):
 				GT_flat = GT.view(GT.size(0),-1)
 
 				if self.model_type in ['U_Net_Seg']:
-					# GT = torch.argmax(seg, dim=1)
 					loss = self.criterion(SR, seg)
 					GT = torch.argmax(seg, dim=1)
 					SR = torch.argmax(F.softmax(SR, dim=1), dim=1)
@@ -223,23 +211,14 @@ class Solver(object):
 					loss = validloss(SR_flat,GT_flat)
 
 				epoch_loss += loss.item()
+				              
 				print('epoch: ', epoch, ' valid batch number: ', i, 'validation loss:', loss.item())
 
 			length = len(self.valid_loader)
-			epoch_loss = epoch_loss/length
-			print('[Validation] ', epoch, 'epoch_loss:', epoch_loss,' best_unet_loss', best_unet_loss)
 
-			'''
-			torchvision.utils.save_image(images.data.cpu(),
-										os.path.join(self.result_path,
-													'%s_valid_%d_image.png'%(self.model_type,epoch+1)))
-			torchvision.utils.save_image(SR.data.cpu(),
-										os.path.join(self.result_path,
-													'%s_valid_%d_SR.png'%(self.model_type,epoch+1)))
-			torchvision.utils.save_image(GT.data.cpu(),
-										os.path.join(self.result_path,
-													'%s_valid_%d_GT.png'%(self.model_type,epoch+1)))
-			'''
+			epoch_loss = epoch_loss/length
+
+			print('[Validation] ', epoch, 'epoch_loss:', epoch_loss,' best_unet_loss', best_unet_loss)
 
 			# Save Best U-Net model
 			if best_unet_loss > epoch_loss:
@@ -264,6 +243,7 @@ class Solver(object):
 		self.print_network(self.unet, self.model_type)
 
 		test_loader, T1_pathlist = get_evalutation_loader(self.batch_size, 4, 'test', augmentation_prob=0, dis=self.dis)
+
 		scorelist = []
 		for i, (images, GT, seg) in enumerate(test_loader):   
 
@@ -281,7 +261,7 @@ class Solver(object):
 				SR = torch.argmax(F.softmax(SR, dim=1),dim=1, keepdims=True)
 			else:
 				SR = self.unet(images)
-
+			
 			loss = 0
 			images = images.data.cpu()[:,0,:,:,:]
 			GT = GT.data.cpu().numpy()[:,0,:,:,:]
@@ -308,13 +288,14 @@ class Solver(object):
 				tis_MRE[0],tis_MRE[1],tis_MRE[2],tis_MRE[3],tis_MRE[4],tis_MRE[5], \
 				value_MAE[0],value_MAE[1], value_MAE[2],value_MAE[3]])
 
-
 			savedir = './results'
+			if not os.path.exists(savedir):
+				os.mkdir(savedir)
 			model_predtion_dir = os.path.join(savedir, 'motor_{}_prediction'.format(self.model_type))
 			if not os.path.exists(model_predtion_dir):
-					os.mkdir(model_predtion_dir)
+				os.mkdir(model_predtion_dir)
 
-			for sub in ['110411', '122317', '124422', '149337','151627']:
+			for sub in os.listdir('./dataset/motor_precessed'):
 				subdir = os.path.join(model_predtion_dir, sub)
 				if not os.path.exists(subdir):
 					os.mkdir(subdir)
@@ -327,17 +308,16 @@ class Solver(object):
 				key = 'Evalue_'+ path.split('/')[-1][3:]
 				np.save(os.path.join(model_predtion_dir, sub+'/'+key), image_tmp)
 
-				if key in ['Evalue_55_56_90.npy','Evalue_50_50_0.npy','Evalue_55_60_180.npy']:
-					save_name = '{}/{}_{}_{}'.format(model_predtion_dir, self.model_type, sub, key[:-4])
-					self.data2nii(images[j,:,:,:], GT[j,:,:,:], SR[j,:,:,:], save_name)
+				# if key in ['Evalue_55_56_90.npy','Evalue_50_50_0.npy','Evalue_55_60_180.npy']:
+				# 	save_name = '{}/{}_{}_{}'.format(model_predtion_dir, self.model_type, sub, key[:-4])
+				# 	self.data2nii(images[j,:,:,:], GT[j,:,:,:], SR[j,:,:,:], save_name)
 
 		names = ['loss','corr','MAE','MSE','PSNR','MRE','MAE_Null','MAE_white','MAE_gray','MAE_CSF','MAE_bone','MAE_skin','MRE_Null','MRE_white','MRE_gray','MRE_CSF','MRE_bone','MRE_skin','<0.2','0.2-0.7','0.7-1.2','>1.2']
 		print(np.array(scorelist).mean(axis=0))
 		print(self.model_type)
 		scorelist = pd.DataFrame(scorelist, columns =names)
-		workdir = './attention_Unet'
-		scorelist.to_csv('{}/{}_score.csv'.format(workdir,self.model_type))
-
+		workdir = './resutls'
+		scorelist.to_csv('{}/{}_score.csv'.format(workdir, self.model_type))
 
 	def evaluation( self, savedir = './dataset'):
 		unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %(self.model_type,self.num_epochs,self.lr,self.num_epochs_decay,self.augmentation_prob))
@@ -347,11 +327,15 @@ class Solver(object):
 		self.unet.train(False)
 		self.unet.eval()
 		self.criterion = torch.nn.MSELoss(reduction='mean')
+
+		savedir = './results'
+		if not os.path.exists(savedir):
+			os.mkdir(savedir)
 		model_predtion_dir = os.path.join(savedir, 'motor_{}_prediction'.format(self.model_type))
 		if not os.path.exists(model_predtion_dir):
 			os.mkdir(model_predtion_dir)
 
-		for sub in ['110411', '122317', '124422', '149337','151627']:
+		for sub in os.listdir('./dataset/motor_precessed'):
 			subdir = os.path.join(model_predtion_dir, sub)
 			if not os.path.exists(subdir):
 				os.mkdir(subdir)
@@ -378,14 +362,18 @@ class Solver(object):
 				sub = path.split('/')[-2]
 				key = 'Evalue_'+ path.split('/')[-1][3:]
 				np.save(os.path.join(model_predtion_dir, sub+'/'+key), image_tmp)
-		return None
+				# if key in ['Evalue_55_56_90.npy','Evalue_50_50_0.npy','Evalue_55_60_180.npy']:
+				# 	save_name = '{}/{}_{}_{}'.format(model_predtion_dir, self.model_type, sub, key[:-4])
+				# 	self.data2nii(images[j,:,:,:], GT[j,:,:,:], SR[j,:,:,:], save_name)
 
+		return None
 
 	def segmentation(self):
 		"""Combine the seg and reg Unet3D_Att"""
 		t1 = time.time()
-		seg_unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %('U_Net_Seg',self.num_epochs,self.lr,self.num_epochs_decay,self.augmentation_prob))
-		reg_unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %('U_Net3D_Att_Seg_V2',self.num_epochs,self.lr,self.num_epochs_decay,self.augmentation_prob))
+		seg_unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %('U_Net_Seg', self.num_epochs, self.lr, self.num_epochs_decay, self.augmentation_prob))
+		reg_unet_path = os.path.join(self.model_path, '%s-%d-%.4f-%d-%.4f.pkl' %('U_Net3D_Att_Seg_V2', self.num_epochs, self.lr, self.num_epochs_decay, self.augmentation_prob))
+		print(seg_unet_path, reg_unet_path)
 		# U-Net Train
 		self.segmentation_unet = U_Net3D_Att(img_ch=1, output_ch=6)
 		self.regression_unet = U_Net3D_Att(img_ch=7, output_ch=1)
@@ -400,16 +388,18 @@ class Solver(object):
 		self.segmentation_unet.eval()
 		self.regression_unet.train(False)
 		self.regression_unet.eval()	
-		self.model_type = 'Two_step_Unet'
+		self.model_type = 'two_step'
 		length=0
 		epoch_loss = 0
 
 		savedir = './results'
-		model_predtion_dir = os.path.join(savedir, 'motor_{}_prediction'.format('Two_step_Unet'))
+		if not os.path.exists(savedir):
+			os.mkdir(savedir)
+		model_predtion_dir = os.path.join(savedir, 'motor_{}_prediction'.format(self.model_type))
 		if not os.path.exists(model_predtion_dir):
 			os.mkdir(model_predtion_dir)
 
-		for sub in ['110411', '122317', '124422', '149337','151627']:
+		for sub in os.listdir('./dataset/motor_precessed'):
 			subdir = os.path.join(model_predtion_dir, sub)
 			if not os.path.exists(subdir):
 				os.mkdir(subdir)
@@ -418,7 +408,7 @@ class Solver(object):
 		scorelist = []
 		with torch.no_grad():
 			for i, (images, GT, seg) in enumerate(dataloader):   
-				
+				print('evaluating')
 				images = images.to(self.device)
 				GT = GT.to(self.device)
 				seg = seg.to(self.device)
@@ -471,19 +461,34 @@ class Solver(object):
 					key = 'Evalue_'+ path.split('/')[-1][3:]
 					np.save(os.path.join(model_predtion_dir, sub+'/'+key), image_tmp)
 
-					if key in ['Evalue_55_56_90.npy','Evalue_50_50_0.npy','Evalue_55_60_180.npy']:
-						save_name = '{}/{}_{}_{}'.format(model_predtion_dir, self.model_type, sub, key[:-4])
-						self.data2nii(preseg[j,:,:,:], seg[j,:,:,:], SR[j,:,:,:], save_name)
 				print('other time',time.time()-t3)
 			print('total time:', time.time()-t1)
 			names = ['loss','corr','MAE','MSE','PSNR','MRE','MAE_Null','MAE_white','MAE_gray','MAE_CSF','MAE_bone','MAE_skin','MRE_Null','MRE_white','MRE_gray','MRE_CSF','MRE_bone','MRE_skin','<0.2','0.2-0.7','0.7-1.2','>1.2']
 			print(np.array(scorelist).mean(axis=0))
 			scorelist = pd.DataFrame(scorelist, columns =names)
-			workdir = './results'
+			workdir = './resutls'
 			scorelist.to_csv('{}/{}_score.csv'.format(workdir,self.model_type))
+
+				
 		return None
 
+	# def data2nii( self, image, label, predict, save_name):
+	# 	sub = '101309'
+	# 	T1_file = nib.load('./SUB_T1/{}_T1.nii.gz'.format(sub))
+	# 	T1 = T1_file.get_data()
+	# 	affine = T1_file.affine
+
+	# 	NewImage = nib.Nifti1Image(image, affine = T1_file.affine, header = T1_file.header)
+	# 	nib.save(NewImage, save_name+'_Image.nii.gz')
 
 
+	# 	NewImage = nib.Nifti1Image(label, affine = T1_file.affine, header = T1_file.header)
+	# 	nib.save(NewImage, save_name+'_GTruth.nii.gz')
+
+
+	# 	NewImage = nib.Nifti1Image(predict, affine = T1_file.affine, header = T1_file.header)
+	# 	nib.save(NewImage, save_name+'_Prediction.nii.gz')
+
+	# 	return None
 
 
