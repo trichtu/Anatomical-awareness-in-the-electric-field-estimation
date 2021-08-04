@@ -44,12 +44,9 @@ def main(config):
     # Train and sample the images
     if config.mode == 'train':
         solver.train()
+    elif (config.mode == 'test') & (config.model != 'two_step'):
         solver.test()
-    elif config.mode == 'test':
-        solver.test()
-    elif config.mode == 'evaluation':
-        solver.evaluation()
-    elif config.mode == 'seg':
+    elif (config.mode == 'test') & (config.model == 'two_step'):
         solver.segmentation()
 
 if __name__ == '__main__':
