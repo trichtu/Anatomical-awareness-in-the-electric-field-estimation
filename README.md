@@ -20,6 +20,6 @@ python main.py --mode test --model U_Net3D
 or
 python main.py --mode test --model two_step
 
-### It would be hopeful to provide a better insight for your work, and if any help for your work, please cite
+### if there is any help for your work and insights, it would be better to cite:
 
 Liang Ma, & Gangliang Zhong et al., (2021) anatomical awareness improves the accuracy of the real-time electric field estimation, processedings of IJCNN 2021, China ShenZhen.
