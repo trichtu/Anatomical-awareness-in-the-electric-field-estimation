@@ -1,5 +1,5 @@
-# Anatomical-awareness-in-the-electric-field-estimation
-## There is the support file for the conference paper: anatomical awareness improves the accuracy of the real-time electric field estimation
+### Anatomical-awareness-in-the-electric-field-estimation
+There is the support file for the conference paper: anatomical awareness improves the accuracy of the real-time electric field estimation
 
 ### Here only support for below models for the anatomcial segmentation or electric estimation:
 
