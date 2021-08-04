@@ -3,7 +3,8 @@ There is the support file for the conference paper: anatomical awareness improve
 
 ### software:
 python 3.8
-torch >=1.8
+
+pytorch >=1.8
 
 
 ### Here only support for below models for the anatomcial segmentation or electric estimation:
