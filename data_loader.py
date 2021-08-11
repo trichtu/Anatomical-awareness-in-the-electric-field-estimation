@@ -8,17 +8,14 @@ from torchvision import transforms as T
 from torchvision.transforms import functional as F
 from PIL import Image
 import os
-
-
-
+from pathlib import Path
 
 class motorFolder(data.Dataset):
-	def __init__(self, mode, augmentation_prob=0.5, dis=False ):
+	def __init__(self, mode, augmentation_prob=0.5):
 		"""Initializes image paths and preprocessing module."""
 		self.root = './dataset/motor_precessed'
 		self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		self.mode = mode
-		self.dis = dis
 		if mode == 'train':
 			sublist = ['101309', '117122', '120111','122620', '128632','131722', '130013', '138534','160123','198451']
 			srange = [0,0.8]
@@ -72,15 +69,15 @@ class motorFolder(data.Dataset):
 		T1_image = np.load(image_path)
 		T1_image = np.expand_dims(T1_image[:80,:80,:40], axis=0)
 		
-		file = image_path.split('/')
-		subdir = image_path[:-len(file[-1])]
+		file = str(Path(image_path).name)
+		subdir = str(Path(image_path).parent)
 
-		key = 'Evalue_'+file[-1][3:]
+		key = 'Evalue_'+file[3:]
 		labelpath = os.path.join(subdir, key)
 		E_image = np.load(labelpath)
 		E_image = np.expand_dims(E_image[:80,:80,:40], axis=0)
 		
-		key = 'Seg_'+file[-1][3:]
+		key = 'Seg_'+file[3:]
 		segpath = os.path.join(subdir, key)
 		Seg_image = np.load(segpath)[:80,:80,:40]
 		
@@ -107,10 +104,10 @@ class motorFolder(data.Dataset):
 
 
 
-def get_data_loader(batch_size, num_workers, mode, augmentation_prob=0.5, dis=False):
+def get_data_loader(batch_size, num_workers, mode, augmentation_prob=0.5):
 	"""Builds and returns Dataloader."""
 	
-	dataset = motorFolder( mode=mode, augmentation_prob=augmentation_prob, dis=dis)
+	dataset = motorFolder( mode=mode, augmentation_prob=augmentation_prob)
 	data_loader = data.DataLoader(dataset=dataset,
 								  batch_size=batch_size,
 								  shuffle=True,
@@ -118,9 +115,9 @@ def get_data_loader(batch_size, num_workers, mode, augmentation_prob=0.5, dis=Fa
 	return data_loader
 
 
-def get_evalutation_loader(batch_size, num_workers, mode, augmentation_prob=0.5, dis=False):
+def get_evalutation_loader(batch_size, num_workers, mode, augmentation_prob=0.5):
 	"""Builds and returns Dataloader."""
-	dataset = motorFolder( mode=mode, augmentation_prob=0, dis=dis)
+	dataset = motorFolder( mode=mode, augmentation_prob=0)
 	image_paths = np.array(dataset.image_paths)
 	data_loader = data.DataLoader(dataset = dataset,
 								  batch_size = batch_size,
