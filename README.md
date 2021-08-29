@@ -28,4 +28,5 @@ python main.py --mode test --model two_step
 
 ### if there is any help for your work and insights, it would be better to cite:
 
-Liang Ma, & Gangliang Zhong et al., (2021) anatomical awareness improves the accuracy of the real-time electric field estimation, processedings of IJCNN 2021, China ShenZhen.
+
+Liang Ma, Gangliang Zhong et al., (2021) Anatomical awareness improves the accuracy of the real-time electric field estimation, proceedings of IEEE International Joint Conference on Neural Network 
