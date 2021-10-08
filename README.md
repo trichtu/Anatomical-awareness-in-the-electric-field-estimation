@@ -28,5 +28,13 @@ python main.py --mode test --model two_step
 
 ### if there is any help for your work and insights, it would be better to cite:
 
+@INPROCEEDINGS{9533894,
+  author={Ma, Liang and Zhong, Gangliang and Yang, Zhengyi and Fan, Linzhong and Jiang, Tianzi},
+  booktitle={2021 International Joint Conference on Neural Networks (IJCNN)}, 
+  title={Multi-scale anatomical awareness improves the accuracy of the real-time electric field estimation}, 
+  year={2021},
+  volume={},
+  number={},
+  pages={1-7},
+  doi={10.1109/IJCNN52387.2021.9533894}}
 
-Liang Ma, Gangliang Zhong et al., (2021) Anatomical awareness improves the accuracy of the real-time electric field estimation, proceedings of IEEE International Joint Conference on Neural Network 
