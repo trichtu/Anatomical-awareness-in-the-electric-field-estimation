@@ -7,7 +7,7 @@ python 3.8
 pytorch >=1.8
 
 
-### In this article, the region is limited in the motor cortex region. Here only support for trained models for the anatomcial segmentation or electric estimation :
+### In this article, due to the trained dataset, the coil position is limited in the motor cortex region. Here only support for trained models for the anatomcial segmentation or electric estimation :
 
 #### anatomical segmentation model:
 'U_Net_Seg'
